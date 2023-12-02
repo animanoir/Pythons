@@ -1,9 +1,9 @@
-# Author: Ardit Sulce, Automate Everything with Python, Udemy
-# Course URL: https://www.udemy.com/course/automate-everything-with-python/
-
 from selenium import webdriver
+from selenium.webdriver.common.by import By
+import pdfkit
+import time
 
-def get_drvier():
+def get_driver():
   # Set options to make browsing easier
   options = webdriver.ChromeOptions()
   options.add_argument("disable-infobars")
@@ -17,9 +17,19 @@ def get_drvier():
   driver.get("https://asalvoenlasoledad.blogspot.com/")
   return driver
 
-def main():
-  driver = get_drvier()
-  element = driver.find_element(by="xpath", value="//*[@id=\"post-body-1962350099577336933\"]/p[1]")
-  return element.text
+def get_blog_content(driver):
+  time.sleep(2)
+  content = driver.find_element(By.TAG_NAME, "body").get_attribute("innerHTML")
+  return content
 
-print(main())
+def main():
+  path_wkhtmltopdf = "./wkhtmltopdf/bin/wkhtmltopdf.exe"
+  config = pdfkit.configuration(wkhtmltopdf=path_wkhtmltopdf)
+  driver = get_driver()
+  blog_content = get_blog_content(driver)
+  driver.quit()
+
+  pdfkit.from_string(blog_content, "blog.pdf",configuration=config)
+
+if __name__ == "__main__":
+    main()

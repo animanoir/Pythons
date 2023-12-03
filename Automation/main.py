@@ -1,6 +1,8 @@
+#-*- coding: UTF-8 -*-
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 import pdfkit
+import base64
 import time
 
 def get_driver():
@@ -19,17 +21,57 @@ def get_driver():
 
 def get_blog_content(driver):
   time.sleep(2)
-  content = driver.find_element(By.TAG_NAME, "body").get_attribute("innerHTML")
-  return content
+  # content = driver.find_element(By.TAG_NAME, "body").get_attribute("innerHTML")
+  all_text = "\n\n".join([p.text for p in driver.find_elements(By.TAG_NAME, "p")])
+  return all_text
+
+def encode_font_to_base64(font_path):
+    with open(font_path, "rb") as font_file:
+        return base64.b64encode(font_file.read()).decode('utf-8')
 
 def main():
   path_wkhtmltopdf = "./wkhtmltopdf/bin/wkhtmltopdf.exe"
   config = pdfkit.configuration(wkhtmltopdf=path_wkhtmltopdf)
   driver = get_driver()
-  blog_content = get_blog_content(driver)
+  all_blog_content = ""
+  page_count = 0  # Initialize page counter
+
+  while page_count < 3:
+    all_blog_content += get_blog_content(driver)
+    try:
+      next_page = driver.find_element(By.CLASS_NAME, "blog-pager-older-link")
+      next_page.click()
+      time.sleep(1)
+    except Exception as e:
+      print(f"No more pages to load or error occurred: {e}")
+      break
+    page_count += 1  # Increment page counter
+
   driver.quit()
 
-  pdfkit.from_string(blog_content, "blog.pdf",configuration=config)
+  font_face = """
+  @font-face {
+    font-family: 'Cardo';
+    src: url(data:application/font-woff;charset=utf-8;base64,[./Cardo-Regular.ttf]) format('truetype');
+  }
+  """
+  style = "<style>{}</style>".format(font_face)
+  html_content = "<html><head>{}</head><body style='font-family:Cardo;'>{}</body></html>".format(style, all_blog_content)
+
+  # Embed the base64 encoded font in HTML
+  font_path = './Cardo-Regular.ttf'  # Replace with your actual font file path
+  encoded_font = encode_font_to_base64(font_path)
+  font_face = f"""
+  @font-face {{
+      font-family: 'Cardo';
+      src: url(data:font/truetype;charset=utf-8;base64,{encoded_font}) format('truetype');
+  }}
+  """
+  style = f"<style>{font_face}</style>"
+  html_content = f"<html><head>{style}</head><body style='font-family:Cardo;'>{all_blog_content}</body></html>"
+
+  # Use pdfkit to generate PDF from HTML
+  pdfkit.from_string(html_content, "blog_content.pdf", configuration=config, options={'encoding': "UTF-8"})
 
 if __name__ == "__main__":
     main()
